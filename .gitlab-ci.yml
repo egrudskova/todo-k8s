@@ -1,0 +1,81 @@
+stages:
+  - test
+  - build
+  - push
+
+variables:
+  IMAGE_TAG_MAIN: $DOCKER_HUB_USERNAME/todo-main:latest
+  IMAGE_TAG_FALLBACK: $DOCKER_HUB_USERNAME/todo-fallback:latest
+
+before_script:
+  - echo $DOCKER_HUB_PASSWORD | docker login -u $DOCKER_HUB_USERNAME --password-stdin
+
+test-main:
+  stage: test
+  script:
+    - cd main
+    - ./gradlew test
+  artifacts:
+    reports:
+      junit: build/test-results/test/TEST-*.xml
+    paths:
+      - main/build/reports/
+  only:
+    changes:
+      - main/**
+      - .gitlab-ci.yml
+
+test-fallback:
+  stage: test
+  script:
+    - cd fallback
+    - ./gradlew test
+  artifacts:
+    reports:
+      junit: build/test-results/test/TEST-*.xml
+    paths:
+      - fallback/build/reports/
+  only:
+    changes:
+      - fallback/**
+      - .gitlab-ci.yml
+
+build-main:
+  stage: build
+  script:
+    - docker build -t $IMAGE_TAG_MAIN ./main
+  only:
+    changes:
+      - main/**
+      - .gitlab-ci.yml
+  needs: ["test-main"]
+
+push-main:
+  stage: push
+  script:
+    - docker push $IMAGE_TAG_MAIN
+  only:
+    changes:
+      - main/**
+      - .gitlab-ci.yml
+  needs: ["build-main"]
+
+build-fallback:
+  stage: build
+  script:
+    - docker build -t $IMAGE_TAG_FALLBACK ./fallback
+  only:
+    changes:
+      - fallback/**
+      - .gitlab-ci.yml
+  needs: ["test-fallback"]
+
+push-fallback:
+  stage: push
+  script:
+    - docker push $IMAGE_TAG_FALLBACK
+  only:
+    changes:
+      - fallback/**
+      - .gitlab-ci.yml
+  needs: ["build-fallback"]
